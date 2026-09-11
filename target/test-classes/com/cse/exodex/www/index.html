@@ -190,6 +190,7 @@
       canvas: canvas,
       logarithmicDepthBuffer: true
     });
+    renderer.setClearColor(0x07101f, 1);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.autoClear = true;
 
@@ -799,6 +800,9 @@
 
       if (mesh.objectData.type == "STAR") {
 
+        mesh.visible = false;
+        scene.remove(mesh);
+
         //  don't bother if it's already targeted
         if (currentSystem && currentSystem.star.objectData.primaryId == mesh.objectData.primaryId) {
           return;
@@ -819,6 +823,10 @@
         }
 
         if (prevSystem) {
+          prevSystem.star.visible = true;
+          if (visibleStars.indexOf(prevSystem.star) != -1) {
+            scene.add(prevSystem.star);
+          }
           updateHighlight(prevSystem.star);
           scene.remove(prevSystem.object);
         }

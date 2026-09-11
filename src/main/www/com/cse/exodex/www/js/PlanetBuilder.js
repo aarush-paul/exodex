@@ -64,7 +64,12 @@ function getDetailMesh(planetData) {
 
   var planet = getPlanet(planetData);
   var planetMesh = new THREE.Mesh(DETAIL_GEOMETRY, planet.material);
-  planetMesh.scale.x = planetMesh.scale.y = planetMesh.scale.z = planetData.radius.value.quantity;
+  var displayRadius = Math.max(
+    planetData.radius.value.quantity,
+    planetData.semiMajorAxisLys.value.quantity * 0.03,
+    2.0e-6
+  );
+  planetMesh.scale.x = planetMesh.scale.y = planetMesh.scale.z = displayRadius;
   planetMesh.rotation.set(planet.rotation.x, planet.rotation.y, planet.rotation.z);
 
   return planetMesh;

@@ -110,7 +110,12 @@ System.prototype.populatePlanets = function () {
       var surround = new THREE.Mesh(TRANSPARENT_GEOMETRY, transparentMaterial);
 
       var distScale = planet.semiMajorAxisLys.value.quantity / 1.58e-5;
-      var invScale = (7.3896e-9 / planet.radius.value.quantity) *
+      var displayRadius = Math.max(
+        planet.radius.value.quantity,
+        planet.semiMajorAxisLys.value.quantity * 0.03,
+        2.0e-6
+      );
+      var invScale = (7.3896e-9 / displayRadius) *
         distScale *
         140;
 
