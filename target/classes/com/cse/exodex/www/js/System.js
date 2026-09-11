@@ -48,6 +48,9 @@ function System(star, position, planets, lookAt) {
   var starDetail = new THREE.Mesh(DETAIL_GEOMETRY, material);
   starDetail.objectData = starData;
   starDetail.scale.x = starDetail.scale.y = starDetail.scale.z = starData.radius.value.quantity;
+  if (starData.primaryId == 1) {
+    starDetail.visible = false;
+  }
 
   object.add(starDetail);
 

@@ -399,6 +399,11 @@
 
     function isRender(objectData) {
 
+      var coordinates = objectData.cartesianCoordsInLys;
+      if (objectData.primaryId != 1 && coordinates.x == 0 && coordinates.y == 0 && coordinates.z == 0) {
+        return false;
+      }
+
       if (objectData.solDistance.value.quantity < renderRadius) {
         return true;
       }
@@ -646,6 +651,9 @@
 
         var surround = new THREE.Mesh(SURROUND_GEOMETRY, shaderSurround);
         surround.objectData = star;
+        if (star.primaryId == 1) {
+          surround.visible = false;
+        }
         resetStarScale(surround);
 
         updateHighlight(surround);

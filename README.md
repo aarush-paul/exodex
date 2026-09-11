@@ -9,7 +9,7 @@ server on port `42315`, so once it is running the web interface is available
 at:
 
 ```text
-http://localhost:42315/
+http://localhost:6769/
 ```
 
 ## Requirements
