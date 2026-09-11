@@ -272,6 +272,12 @@
           <include>**/*.jpeg</include>
         </includes>
       </resource>
+      <resource>
+        <directory>${project.basedir}</directory>
+        <includes>
+          <include>main_data.csv</include>
+        </includes>
+      </resource>
     </resources>
 
     <testResources>

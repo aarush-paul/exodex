@@ -37,3 +37,4 @@ com/cse/exodex/datasets/ConstellationCorpus.class
 com/cse/exodex/datasets/DatasetName.class
 com/cse/exodex/util/Converter.class
 com/cse/exodex/api/StarCatalogServlet.class
+com/cse/exodex/WebServer$1.class

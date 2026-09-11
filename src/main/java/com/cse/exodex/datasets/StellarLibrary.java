@@ -42,7 +42,10 @@ public class StellarLibrary {
 
       String glieseName = ids.getGlieseId();
       if (glieseName != null) {
-        starsByGJId.put(getGJ(glieseName, true), record);
+        String normalizedGJ = getGJ(glieseName, false);
+        if (normalizedGJ != null) {
+          starsByGJId.put(normalizedGJ, record);
+        }
       }
 
       BayerFlamsteed bayerFlamsteed = ids.getBayerFlamsteed();

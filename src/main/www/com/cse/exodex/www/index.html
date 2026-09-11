@@ -6,6 +6,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Orbitron:wght@400..900&display=swap" rel="stylesheet">
   <link rel="stylesheet" type="text/css" href="resources/css/jquery-ui.css">
   <link rel="stylesheet" type="text/css" href="css/exodex.css">
 
@@ -30,121 +33,89 @@
 </head>
 
 <body>
-
-  <div>
-    <div id="selector">
-      <h3><span id="info-header" class="accordion-header"></span><b> - <span id="distance-header"
-            class="accordion-header"></span></b></h3>
-      <div class="overlay-panel">
-        <table>
-          <tbody id="info-table"></tbody>
-        </table>
-      </div>
-
-      <h3>Explore</h3>
-      <div class="overlay-panel">
-        <div class="ui-widget">
-          <label for="jump_to_list">Search: </label>
-          <input id="jump_to_list" type="text">
-        </div>
-
-      </div>
-
-      <h3>View</h3>
-      <div class="overlay-panel">
-
-        <table>
-          <tbody>
-
-            <tr class="header-row overlay-header">
-              <td>
-                <b>Control Mode</b>
-              </td>
-            </tr>
-
-            <tr class="child-row">
-              <td>
-                <form id="control_mode" name="control_mode" action="#" method="POST">
-                  <div>
-                    <label>
-                      <input type="radio" name="control_mode" value="orbit" checked>
-                    </label> Orbit
-                    <label>
-                      <input type="radio" name="control_mode" value="free">
-                    </label> Free Look
-                  </div>
-                </form>
-              </td>
-            </tr>
-
-            <tr class="header-row overlay-header">
-              <td>
-                <b>Rendering from different telescope diameters (Sol lys)</b>
-              </td>
-            </tr>
-
-            <tr class="child-row">
-              <td>
-                <form id="render_radius" name="render_radius" action="#" method="POST">
-                  <div>
-                    <label>
-                      <input type="radio" name="render_radius" value="10">
-                    </label> 10
-                    <label>
-                      <input type="radio" name="render_radius" value="25">
-                    </label> 25
-                    <label>
-                      <input type="radio" name="render_radius" value="50" checked>
-                    </label> 50
-                    <label>
-                      <input type="radio" name="render_radius" value="75" checked>
-                    </label> 75
-                  </div>
-                </form>
-              </td>
-            </tr>
-
-            <tr class="header-row overlay-header">
-              <td>
-                <b>Highlight</b>
-              </td>
-            </tr>
-
-            <tr class="child-row">
-              <td>
-                <form id="highlight_mode" name="highlight_mode" action="#" method="POST">
-                  <div>
-                    <label>
-                      <input type="radio" name="highlight_mode" value="none" checked>
-                    </label> None
-                    <label>
-                      <input type="radio" name="highlight_mode" value="exoplanets">
-                    </label> Exoplanets
-                    <label>
-                      <input type="radio" name="highlight_mode" value="all">
-                    </label> All
-                  </div>
-                </form>
-              </td>
-            </tr>
-
-          </tbody>
-        </table>
-      </div>
-
+  <canvas id="webgl_canvas"></canvas>
+  <header class="topbar glass-panel">
+    <div class="brand-mark">EX</div>
+    <div>
+      <p class="eyebrow">Deep space field guide</p>
+      <h1>Exodex <span>Exoplanet Visualiser</span></h1>
     </div>
+    <div class="telemetry"><span class="status-dot"></span><span id="distance-header">Awaiting target</span></div>
+  </header>
 
-    <canvas id='webgl_canvas'></canvas>
-  </div>
+  <aside class="left-rail glass-panel" id="selector">
+    <nav class="view-tabs" aria-label="Exodex views">
+      <button class="view-tab active" data-view="search-view">Search</button>
+      <button class="view-tab" data-view="systems-view">Systems</button>
+      <button class="view-tab" data-view="controls-view">View Controls</button>
+    </nav>
+
+    <section class="view-panel active" id="search-view">
+      <p class="section-kicker">Navigate the atlas</p>
+      <h2>Visit a system</h2>
+      <p class="muted">Search by host star or exoplanet system name.</p>
+      <label class="field-label" for="jump_to_list">Target system</label>
+      <div class="search-field">
+        <span class="search-icon">⌕</span>
+        <input id="jump_to_list" type="text" placeholder="Try Kepler, HD, GJ..." autocomplete="off">
+      </div>
+      <div class="quick-note"><span>↗</span> Press Enter to jump to a matched system</div>
+    </section>
+
+    <section class="view-panel" id="systems-view">
+      <div class="section-heading"><div><p class="section-kicker">Catalog index</p><h2>Known systems</h2></div><span class="count-badge" id="system-count">0</span></div>
+      <div id="systems-list" class="systems-list"><p class="muted">Loading systems...</p></div>
+    </section>
+
+    <section class="view-panel" id="controls-view">
+      <p class="section-kicker">Instrument & display</p>
+      <h2>View Controls</h2>
+      <div class="control-group">
+        <span class="control-label">Control mode</span>
+        <form id="control_mode" name="control_mode" action="#" method="POST" class="segmented-control">
+          <label><input type="radio" name="control_mode" value="orbit" checked><span>Orbit</span></label>
+          <label><input type="radio" name="control_mode" value="free"><span>Free look</span></label>
+        </form>
+      </div>
+      <div class="control-group">
+        <span class="control-label">Telescope reach <small>(Sol ly)</small></span>
+        <form id="render_radius" name="render_radius" action="#" method="POST" class="choice-row">
+          <label><input type="radio" name="render_radius" value="10"><span>10</span></label>
+          <label><input type="radio" name="render_radius" value="25"><span>25</span></label>
+          <label><input type="radio" name="render_radius" value="50" checked><span>50</span></label>
+          <label><input type="radio" name="render_radius" value="75"><span>75</span></label>
+        </form>
+      </div>
+      <div class="control-group">
+        <span class="control-label">Highlight</span>
+        <form id="highlight_mode" name="highlight_mode" action="#" method="POST" class="choice-row">
+          <label><input type="radio" name="highlight_mode" value="none" checked><span>None</span></label>
+          <label><input type="radio" name="highlight_mode" value="exoplanets"><span>Systems</span></label>
+          <label><input type="radio" name="highlight_mode" value="all"><span>All stars</span></label>
+        </form>
+      </div>
+    </section>
+
+    <div class="rail-footer"><span class="footer-orb"></span> NASA archive data · live scene</div>
+  </aside>
+
+  <aside class="right-panel glass-panel" id="info-panel">
+    <div class="selection-heading">
+      <div><p class="section-kicker">Current selection</p><h2 id="info-header">No target selected</h2></div>
+      <span class="selection-type" id="selection-type">FIELD</span>
+    </div>
+    <div class="selection-rule"></div>
+    <table><tbody id="info-table"><tr><td class="empty-state" colspan="2">Select a star or planet in the scene to inspect its archive data.</td></tr></tbody></table>
+  </aside>
 
   <script>
 
-    $(function () {
-      $("#selector").accordion({
-        collapsible: true,
-        animate: 100,
-        heightStyle: 'panel'
-      });
+    $(".view-tab").click(function () {
+      var view = $(this).data("view");
+      $(".view-tab").removeClass("active");
+      $(this).addClass("active");
+      $(".view-panel").removeClass("active");
+      $("#" + view).addClass("active");
     });
 
     var distanceHeader = $("#distance-header");
@@ -251,6 +222,10 @@
     var visibleStarsByName = {};
     var renderRadius = 75;
 
+    $("#systems-list").on("click", ".system-item", function () {
+      select(starsByID[$(this).data("star-id")]);
+    });
+
 
     $("#jump_to_list").keydown(function (e) {
       if (e.keyCode == 13) {
@@ -298,26 +273,41 @@
             currentObjectMesh.objectData.radius.value.quantity * 10, approachTime,
             function () {
 
+              var finishTargeting = function () {
+                if (isStar(prevStarMesh) && prevStarMesh.objectData.nearbyObjectIDs) {
+                  prevStarMesh.objectData.nearbyObjectIDs.forEach(function (e) {
+                    if (starsByID[e]) {
+                      resetStarScale(starsByID[e]);
+                    }
+                  })
+                }
+
+                if (!prevControlMode || prevControlMode == 'tween') {
+                  controlMode = 'orbit';
+                } else {
+                  controlMode = prevControlMode
+                }
+
+                orbitControls.orbit(
+                  absolutePosition(currentObjectMesh),
+                  currentObjectMesh.objectData.radius.value.quantity * 2
+                )
+              };
+
               if (isStar(currentObjectMesh)) {
                 currentSystem.populatePlanets();
-              }
-
-              if (isStar(prevStarMesh)) {
-                prevStarMesh.objectData.nearbyObjectIDs.forEach(function (e) {
-                  resetStarScale(starsByID[e]);
-                })
-              }
-
-              if (!prevControlMode || prevControlMode == 'tween') {
-                controlMode = 'orbit';
+                var outerOrbit = currentSystem.planets.reduce(function (largest, planet) {
+                  return Math.max(largest, planet.semiMajorAxisLys.value.quantity);
+                }, currentObjectMesh.objectData.radius.value.quantity * 2);
+                tweenControls.setZoom(
+                  absolutePosition(currentObjectMesh),
+                  Math.max(outerOrbit * 1.5, currentObjectMesh.objectData.radius.value.quantity * 10),
+                  1,
+                  finishTargeting
+                );
               } else {
-                controlMode = prevControlMode
+                finishTargeting();
               }
-
-              orbitControls.orbit(
-                absolutePosition(currentObjectMesh),
-                currentObjectMesh.objectData.radius.value.quantity * 2
-              )
 
             }
           )
@@ -483,6 +473,32 @@
         minLength: 4
       });
 
+      renderSystemsList();
+
+    }
+
+    function renderSystemsList() {
+      var list = $("#systems-list");
+      list.empty();
+      var systemCount = 0;
+      visibleStars.sort(function (left, right) {
+        return left.objectData.properName.localeCompare(right.objectData.properName);
+      }).slice(0, 120).forEach(function (starMesh) {
+        var star = starMesh.objectData;
+        var planetCount = planetsByStarID[star.primaryId] ? planetsByStarID[star.primaryId].length : 0;
+        list.append($('<button class="system-item" type="button"></button>')
+          .attr("data-star-id", star.primaryId)
+          .append($('<span class="system-icon">✦</span>'))
+          .append($('<span class="system-copy"></span>')
+            .append($('<strong></strong>').text(star.properName))
+            .append($('<small></small>').text(planetCount + " planet" + (planetCount == 1 ? "" : "s"))))
+          .append($('<span class="system-arrow">→</span>')));
+        systemCount++;
+      });
+      $("#system-count").text(systemCount + (visibleStars.length > 120 ? "+" : ""));
+      if (systemCount == 0) {
+        list.append('<p class="muted">No systems in this telescope range.</p>');
+      }
     }
 
     function closestNonPrimaryObject(intersects, currentPrimary, currentStarPrimary) {
@@ -698,6 +714,7 @@
           if (newTargetPrimaryId != currentObjectPrimaryId) {
 
             $('#info-header').text(newTarget.properName);
+            $('#selection-type').text(newTarget.type == "STAR" ? "HOST STAR" : "EXOPLANET");
 
             var infoTable = $('#info-table');
             infoTable.empty();
@@ -941,9 +958,12 @@
       if (currentSystem) {
 
         var currentStar = currentSystem.star;
-        if (currentStar) {
+        if (currentStar && currentStar.objectData.nearbyObjectIDs) {
           currentStar.objectData.nearbyObjectIDs.forEach(function (e) {
             var nearStar = starsByID[e];
+            if (!nearStar) {
+              return;
+            }
             var distance = camera.position.distanceTo(nearStar.position) * .3;
             var childUniform = nearStar.material.uniforms;
             if (childUniform.scale.value != distance) {

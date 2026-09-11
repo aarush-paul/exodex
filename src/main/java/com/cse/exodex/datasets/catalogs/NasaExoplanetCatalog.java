@@ -1,12 +1,21 @@
 package com.cse.exodex.datasets.catalogs;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.BufferedReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.Scanner;
-import java.util.zip.GZIPInputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.cse.exodex.datasets.PlanetData;
 import com.cse.exodex.datasets.StarRecord;
+import com.cse.exodex.datasets.StarIdentifiers;
+import com.cse.exodex.datasets.AstroConvert;
+import com.cse.exodex.datasets.ExternalLinks;
 import com.cse.exodex.datasets.StellarLibrary;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.LinkedListMultimap;
@@ -18,81 +27,77 @@ public class NasaExoplanetCatalog implements ExoplanetCatalog {
   private static final Logger LOG = LoggerFactory.getLogger(NasaExoplanetCatalog.class);
 
   private final Multimap<Integer, PlanetData> allPlanetsByStarID = LinkedListMultimap.create();
+  private final Map<String, StarRecord> syntheticStarsByHost = new HashMap<String, StarRecord>();
 
   public NasaExoplanetCatalog(StellarLibrary library) throws IOException {
+    InputStream stream = NasaExoplanetCatalog.class.getClassLoader().getResourceAsStream("main_data.csv");
+    if (stream == null) {
+      throw new IOException("Could not find main_data.csv on the classpath");
+    }
 
-    Scanner nasaPlanets = new Scanner(new GZIPInputStream(HYGDatabase.class.getClassLoader()
-        .getResourceAsStream("com/cse/exodex/datasets/planets-nasa-10-9-16.csv.gz")));
-
-
-    int planetCount = 0;
-
-
+    BufferedReader nasaPlanets = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8));
     String headerLine;
     do {
-      headerLine = nasaPlanets.nextLine();
-    } while (headerLine.charAt(0) == '#');
+      headerLine = nasaPlanets.readLine();
+    } while (headerLine != null && headerLine.startsWith("#"));
+    if (headerLine == null) {
+      throw new IOException("main_data.csv does not contain a header");
+    }
 
-    nasaPlanets.nextLine();
-
-    while (nasaPlanets.hasNext()) {
-      String next = nasaPlanets.nextLine();
-
-
-      String[] line = next.split(",");
-
-      Integer planetID = Integer.parseInt(line[0]);
-      String starName = line[1];
-      String planetLetter = line[2];
-
-      StarRecord starRecord = library.find(starName);
-
-      //  ignore planets outside 75 lys for now
-      if (!line[42].equals("") && Double.parseDouble(line[42]) > 75.0 / 0.306601) {
+    Map<String, Integer> columns = columnIndexes(parseCsvLine(headerLine));
+    int planetCount = 0;
+    int unmatchedCount = 0;
+    String next;
+    while ((next = nasaPlanets.readLine()) != null) {
+      if (next.trim().isEmpty() || next.startsWith("#")) {
         continue;
       }
 
-      String orbitalPeriodDaysRaw = line[5];
-      String semiMajorAxisRaw = line[9];
-      String eccentricityRaw = line[13];
-      String inclinationRaw = line[17];
+      String[] line = parseCsvLine(next);
+      String starName = value(line, columns, "hostname");
+      if (starName.isEmpty()) {
+        continue;
+      }
 
-      String massRaw = line[21];
-      String massCalc = line[25];
-      String radiusRaw = line[26];
-      String densityRaw = line[30];
+      StarRecord starRecord = findStar(library, starName,
+          value(line, columns, "hip_name"), value(line, columns, "hd_name"));
+      if (starRecord == null) {
+        starRecord = syntheticStarsByHost.get(starName);
+        if (starRecord == null) {
+          starRecord = createSyntheticStar(starName, line, columns);
+          syntheticStarsByHost.put(starName, starRecord);
+        }
+        unmatchedCount++;
+      }
 
+      String massRaw = firstValue(line, columns, "pl_massj", "pl_bmassj");
+      String radiusRaw = firstValue(line, columns, "pl_radj");
+      Unit radiusUnit = Unit.RADIUS_JUP;
+      if (radiusRaw.isEmpty()) {
+        radiusRaw = firstValue(line, columns, "pl_rade");
+        radiusUnit = Unit.RADIUS_EARTH;
+      }
+
+      allPlanetsByStarID.put(starRecord.getPrimaryId(), new PlanetData(
+          parseInteger(value(line, columns, "rowid")),
+          starRecord.getPrimaryId(),
+          new PlanetData.PlanetName(starName, value(line, columns, "pl_letter"),
+              value(line, columns, "pl_name")),
+          ObjectValue.value(value(line, columns, "pl_orbsmax"), Unit.AU, Unit.LY, PlanetDefaults.DEFAULT_SEMI_MAJOR_AXIS),
+          ObjectValue.value(value(line, columns, "pl_orbeccen"), Unit.NONE, Unit.NONE, PlanetDefaults.DEFAULT_ECCENTRICITY),
+          ObjectValue.value(value(line, columns, "pl_orbper"), Unit.DAY, Unit.DAY, PlanetDefaults.DEFAULT_ORBITAL_PERIOD),
+          ObjectValue.value(value(line, columns, "pl_orbincl"), Unit.DEGREE_GEOM, Unit.DEGREE_GEOM, PlanetDefaults.DEFAULT_INCLINATION),
+          ObjectValue.value(massRaw, Unit.MASS_JUP, Unit.KG, PlanetDefaults.DEFAULT_MASS),
+          ObjectValue.value(radiusRaw, radiusUnit, Unit.LY, PlanetDefaults.DEFAULT_RADIUS),
+          ObjectValue.value(value(line, columns, "pl_dens"), Unit.G_PER_CC, Unit.G_PER_CC, PlanetDefaults.DENSITY),
+          ObjectValue.value("", Unit.DEGREE_GEOM, Unit.DEGREE_GEOM, PlanetDefaults.DEFAULT_LONG_ASCENDING),
+          ObjectValue.value("", Unit.DEGREE_GEOM, Unit.DEGREE_GEOM, PlanetDefaults.DEFAULT_ARGUMENT_PERHELION),
+          ObjectValue.value("", Unit.DEGREE_GEOM, Unit.DEGREE_GEOM, PlanetDefaults.DEFAULT_AXIAL_TILT)
+      ));
       planetCount++;
-
-      if (starRecord == null) {
-        starRecord = library.find(line[166]);   //  HIPPARCOS
-      }
-
-      if (starRecord == null) {
-        starRecord = library.find(line[165]);
-      }
-
-      if (starRecord != null) {
-        allPlanetsByStarID.put(starRecord.getPrimaryId(), new PlanetData(
-            planetID,
-            starRecord.getPrimaryId(),
-            new PlanetData.PlanetName(starName, planetLetter, null),
-            ObjectValue.value(semiMajorAxisRaw, Unit.AU, Unit.LY, PlanetDefaults.DEFAULT_SEMI_MAJOR_AXIS),
-            ObjectValue.value(eccentricityRaw, Unit.NONE, Unit.NONE, PlanetDefaults.DEFAULT_ECCENTRICITY),
-            ObjectValue.value(orbitalPeriodDaysRaw, Unit.DAY, Unit.DAY, PlanetDefaults.DEFAULT_ORBITAL_PERIOD),
-            ObjectValue.value(inclinationRaw, Unit.DEGREE_GEOM, Unit.DEGREE_GEOM, PlanetDefaults.DEFAULT_INCLINATION),
-            ObjectValue.value(massRaw, Unit.MASS_JUP, Unit.KG, PlanetDefaults.DEFAULT_MASS, massCalc),
-            ObjectValue.value(radiusRaw, Unit.RADIUS_JUP, Unit.LY, PlanetDefaults.DEFAULT_RADIUS),
-            ObjectValue.value(densityRaw, Unit.G_PER_CC, Unit.G_PER_CC, PlanetDefaults.DENSITY),
-            ObjectValue.value("", Unit.DEGREE_GEOM, Unit.DEGREE_GEOM, PlanetDefaults.DEFAULT_LONG_ASCENDING),
-            ObjectValue.value("", Unit.DEGREE_GEOM, Unit.DEGREE_GEOM, PlanetDefaults.DEFAULT_ARGUMENT_PERHELION),
-            ObjectValue.value("", Unit.DEGREE_GEOM, Unit.DEGREE_GEOM, PlanetDefaults.DEFAULT_AXIAL_TILT)
-        ));
-      } else {
-        LOG.warn("probably not enough data lolfor name: " + starName);
-      }
-
     }
+    nasaPlanets.close();
+    LOG.info("Loaded " + planetCount + " exoplanets from main_data.csv; unmatched hosts: " + unmatchedCount);
 
     allPlanetsByStarID.put(1, new PlanetData(
         null,
@@ -224,6 +229,104 @@ public class NasaExoplanetCatalog implements ExoplanetCatalog {
 
     LOG.info("Found stars from HYG");
 
+  }
+
+  public Collection<StarRecord> getSyntheticStars() {
+    return new ArrayList<StarRecord>(syntheticStarsByHost.values());
+  }
+
+  private static StarRecord createSyntheticStar(String hostName, String[] line,
+                                                Map<String, Integer> columns) {
+    StarIdentifiers identifiers = new StarIdentifiers();
+    identifiers.setProperName(hostName);
+    double distanceParsecs = parseDoubleOrDefault(value(line, columns, "sy_dist"), 0.0);
+    double rightAscension = parseDoubleOrDefault(value(line, columns, "ra"), 0.0);
+    double declination = parseDoubleOrDefault(value(line, columns, "dec"), 0.0);
+    return new StarRecord(
+        identifiers,
+        new ExternalLinks(),
+        new ObjectValue(AstroConvert.parsecsToLightyears(distanceParsecs), ValueSource.DEFAULT, Unit.LY),
+        new ObjectValue(AstroConvert.degreesToRadians(rightAscension), ValueSource.DEFAULT, Unit.RADIAN),
+        new ObjectValue(AstroConvert.degreesToRadians(declination), ValueSource.DEFAULT, Unit.RADIAN),
+        new ObjectValue(0.0, ValueSource.DEFAULT, Unit.MV),
+        "G2V",
+        null,
+        1.0
+    );
+  }
+
+  private static double parseDoubleOrDefault(String raw, double defaultValue) {
+    if (raw.isEmpty()) {
+      return defaultValue;
+    }
+    try {
+      return Double.parseDouble(raw);
+    } catch (NumberFormatException e) {
+      return defaultValue;
+    }
+  }
+
+  private static Map<String, Integer> columnIndexes(String[] header) {
+    Map<String, Integer> columns = new HashMap<String, Integer>();
+    for (int i = 0; i < header.length; i++) {
+      columns.put(header[i].trim(), i);
+    }
+    return columns;
+  }
+
+  private static String value(String[] line, Map<String, Integer> columns, String column) {
+    Integer index = columns.get(column);
+    return index == null || index >= line.length ? "" : line[index].trim();
+  }
+
+  private static String firstValue(String[] line, Map<String, Integer> columns, String... names) {
+    for (String name : names) {
+      String value = value(line, columns, name);
+      if (!value.isEmpty()) {
+        return value;
+      }
+    }
+    return "";
+  }
+
+  private static Integer parseInteger(String raw) {
+    return raw.isEmpty() ? null : Integer.valueOf(raw);
+  }
+
+  private static StarRecord findStar(StellarLibrary library, String... names) throws IOException {
+    for (String name : names) {
+      if (!name.isEmpty()) {
+        StarRecord record = library.find(name);
+        if (record != null) {
+          return record;
+        }
+      }
+    }
+    return null;
+  }
+
+  private static String[] parseCsvLine(String line) {
+    java.util.List<String> fields = new java.util.ArrayList<String>();
+    StringBuilder field = new StringBuilder();
+    boolean quoted = false;
+    for (int i = 0; i < line.length(); i++) {
+      char current = line.charAt(i);
+      if (current == '"') {
+        if (quoted && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+          field.append('"');
+          i++;
+        } else {
+          quoted = !quoted;
+        }
+      } else if (current == ',' && !quoted) {
+        fields.add(field.toString());
+        field.setLength(0);
+      } else {
+        field.append(current);
+      }
+    }
+    fields.add(field.toString());
+    return fields.toArray(new String[fields.size()]);
   }
 
   @Override
